@@ -13,70 +13,138 @@ wslapi_library& wslapi_library::load()
 
 wslapi_library::wslapi_library()
 {
-    _wslApiDll = LoadLibraryEx(L"wslapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (_wslApiDll != nullptr)
+    _wslapi_dll = LoadLibraryEx(L"wslapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (_wslapi_dll == nullptr)
     {
-        _isDistributionRegistered = (WSL_IS_DISTRIBUTION_REGISTERED)GetProcAddress(_wslApiDll, "WslIsDistributionRegistered");
-        _registerDistribution = (WSL_REGISTER_DISTRIBUTION)GetProcAddress(_wslApiDll, "WslRegisterDistribution");
-        _configureDistribution = (WSL_CONFIGURE_DISTRIBUTION)GetProcAddress(_wslApiDll, "WslConfigureDistribution");
-        _launchInteractive = (WSL_LAUNCH_INTERACTIVE)GetProcAddress(_wslApiDll, "WslLaunchInteractive");
-        _launch = (WSL_LAUNCH)GetProcAddress(_wslApiDll, "WslLaunch");
+        throw std::runtime_error("Failed to load wslapi.dll. Try target x64 (amd64)");
     }
-    else
-    {
-        throw std::runtime_error("Failed to load wslapi.dll");
-    }
+
+    _is_distribution_registered = (WSL_IS_DISTRIBUTION_REGISTERED)GetProcAddress(_wslapi_dll, "WslIsDistributionRegistered");
+    _register_distribution = (WSL_REGISTER_DISTRIBUTION)GetProcAddress(_wslapi_dll, "WslRegisterDistribution");
+    _unregister_distribution = (WSL_UNREGISTER_DISTRIBUTION)GetProcAddress(_wslapi_dll, "WslUnregisterDistribution");
+    _get_configure_distribution = (WSL_GET_DISTRIBUTION_CONFIGURATION)GetProcAddress(_wslapi_dll, "WslGetDistributionConfiguration");
+    _configure_distribution = (WSL_CONFIGURE_DISTRIBUTION)GetProcAddress(_wslapi_dll, "WslConfigureDistribution");
+    _launch_interactive = (WSL_LAUNCH_INTERACTIVE)GetProcAddress(_wslapi_dll, "WslLaunchInteractive");
+    _launch = (WSL_LAUNCH)GetProcAddress(_wslapi_dll, "WslLaunch");
 }
 
 wslapi_library::~wslapi_library()
 {
-    if (_wslApiDll != nullptr)
+    if (_wslapi_dll != nullptr)
     {
-        FreeLibrary(_wslApiDll);
+        FreeLibrary(_wslapi_dll);
     }
 }
 
-//BOOL WslApiLoader::WslIsDistributionRegistered()
-//{
-//    return _isDistributionRegistered(_distributionName.c_str());
-//}
-//
-//HRESULT WslApiLoader::WslRegisterDistribution()
-//{
-//    HRESULT hr = _registerDistribution(_distributionName.c_str(), L"install.tar.gz");
-//    if (FAILED(hr)) {
-//        std::cout << "Failed " << __FUNCTION__ << std::endl;
-//    }
-//
-//    return hr;
-//}
-//
-//HRESULT WslApiLoader::WslConfigureDistribution(ULONG defaultUID, WSL_DISTRIBUTION_FLAGS wslDistributionFlags)
-//{
-//    HRESULT hr = _configureDistribution(_distributionName.c_str(), defaultUID, wslDistributionFlags);
-//    if (FAILED(hr)) {
-//        std::cout << "Failed " << __FUNCTION__ << std::endl;
-//    }
-//
-//    return hr;
-//}
-//
-//HRESULT WslApiLoader::WslLaunchInteractive(PCWSTR command, BOOL useCurrentWorkingDirectory, DWORD* exitCode)
-//{
-//    HRESULT hr = _launchInteractive(_distributionName.c_str(), command, useCurrentWorkingDirectory, exitCode);
-//    if (FAILED(hr)) {
-//        std::cout << "Failed " << __FUNCTION__ << std::endl;
-//    }
-//
-//    return hr;
-//}
-//
-//HRESULT WslApiLoader::WslLaunch(PCWSTR command, BOOL useCurrentWorkingDirectory, HANDLE stdIn, HANDLE stdOut, HANDLE stdErr, HANDLE* process)
-//{
-//    HRESULT hr = _launch(_distributionName.c_str(), command, useCurrentWorkingDirectory, stdIn, stdOut, stdErr, process);
-//    if (FAILED(hr)) {
-//        std::cout << "Failed " << __FUNCTION__ << std::endl;
-//    }
-//
-//    return hr;
-//}
+BOOL wslapi_library::is_distribution_registered(PCWSTR distribution_name)
+{
+    if (_is_distribution_registered == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslIsDistributionRegistered");
+    }
+
+    return _is_distribution_registered(distribution_name);
+}
+HRESULT wslapi_library::register_distribution(PCWSTR distribution_name, PCWSTR tar_file_path)
+{
+    if (_register_distribution == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslRegisterDistribution");
+    }
+
+    return _register_distribution(distribution_name, tar_file_path);
+}
+
+HRESULT wslapi_library::unregister_distribution(PCWSTR distribution_name)
+{
+    if (_unregister_distribution == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslUnregisterDistribution");
+    }
+
+    return _unregister_distribution(distribution_name);
+}
+
+HRESULT wslapi_library::get_distribution_configuration(
+    PCWSTR distribution_name
+    , ULONG* distributionVersion
+    , ULONG* defaultUID
+    , WSL_DISTRIBUTION_FLAGS* wslDistributionFlags
+    , PSTR** defaultEnvironmentVariables
+    , ULONG* defaultEnvironmentVariableCount
+) {
+    if (_get_configure_distribution == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslGetDistributionConfiguration");
+    }
+
+    return _get_configure_distribution(
+        distribution_name
+        , distributionVersion
+        , defaultUID
+        , wslDistributionFlags
+        , defaultEnvironmentVariables
+        , defaultEnvironmentVariableCount
+    );
+}
+
+HRESULT wslapi_library::configure_distribution(
+    PCWSTR distribution_name
+    , ULONG default_uid
+    , WSL_DISTRIBUTION_FLAGS flags
+) {
+    if (_configure_distribution == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslConfigureDistribution");
+    }
+
+    return _configure_distribution(
+        distribution_name
+        , default_uid
+        , flags
+    );
+}
+
+HRESULT wslapi_library::launch_interactive(
+    PCWSTR distribution_name
+    , PCWSTR command
+    , BOOL use_current_working_directory
+    , DWORD* exit_code
+) {
+    if (_launch_interactive == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslLaunchInteractive");
+    }
+
+    return _launch_interactive(
+        distribution_name
+        , command
+        , use_current_working_directory
+        , exit_code
+    );
+}
+
+HRESULT wslapi_library::launch(
+    PCWSTR distribution_name
+    , PCWSTR command
+    , BOOL use_current_working_directory
+    , HANDLE std_In
+    , HANDLE std_out
+    , HANDLE std_err
+    , HANDLE* process
+) {
+    if (_launch == nullptr)
+    {
+        throw std::runtime_error("Cannot get procedure WslLaunch");
+    }
+
+    return _launch(
+        distribution_name
+        , command
+        , use_current_working_directory
+        , std_In
+        , std_out
+        , std_err
+        , process
+    );
+}
